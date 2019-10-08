@@ -1,0 +1,36 @@
+﻿@namespace Oqtane.Modules.Admin.Roles
+@inherits ModuleBase
+@inject IRoleService RoleService
+
+@if (Roles == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <ActionLink Action="Add" Text="Add Role" Style="float: right; margin: 10px;" />
+
+    <Pager Items="@Roles">
+        <Header>
+            <th>Name</th>
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
+        </Header>
+        <Row>
+            <td>@context.Name</td>
+            <td><ActionLink Action="Edit" Parameters="@($"id=" + context.RoleId.ToString())" /></td>
+            <td><ActionLink Action="Delete" Parameters="@($"id=" + context.RoleId.ToString())" Class="btn btn-danger" /></td>
+        </Row>
+    </Pager>
+}
+
+@code {
+    public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Admin; } }
+
+    List<Role> Roles;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Roles = await RoleService.GetRolesAsync(PageState.Site.SiteId);
+    }
+}

@@ -1,41 +1,39 @@
-﻿@using Oqtane.Services
-@using Oqtane.Models
-@using Oqtane.Modules
-@using Oqtane.Client.Modules.Controls
+﻿@namespace Oqtane.Modules.Admin.Users
 @inherits ModuleBase
+@inject IUserRoleService UserRoleService
 
-@inject IUserService UserService
-
-@if (Users == null)
+@if (userroles == null)
 {
     <p><em>Loading...</em></p>
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Name</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var User in Users)
-            {
-                <tr>
-                    <td>@User.Username</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <ActionLink Action="Add" Text="Add User" Style="float: right; margin: 10px;" />
+
+    <Pager Items="@userroles">
+        <Header>
+            <th>Name</th>
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
+        </Header>
+        <Row>
+            <td>@context.User.DisplayName</td>
+            <td><ActionLink Action="Edit" Parameters="@($"id=" + context.UserId.ToString())" /></td>
+            <td><ActionLink Action="Delete" Parameters="@($"id=" + context.UserId.ToString())" Class="btn btn-danger" /></td>
+            <td><ActionLink Action="Roles" Parameters="@($"id=" + context.UserId.ToString())" /></td>
+        </Row>
+    </Pager>
 }
 
 @code {
-    public override SecurityAccessLevelEnum SecurityAccessLevel { get { return SecurityAccessLevelEnum.Host; } }
+    public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Admin; } }
 
-    List<User> Users;
+    List<UserRole> userroles;
 
-    protected override async Task OnInitAsync()
+    protected override async Task OnInitializedAsync()
     {
-        Users = await UserService.GetUsersAsync();
+        userroles = await UserRoleService.GetUserRolesAsync(PageState.Site.SiteId);
+        userroles = userroles.Where(item => item.Role.Name == Constants.RegisteredRole).ToList();
     }
 }

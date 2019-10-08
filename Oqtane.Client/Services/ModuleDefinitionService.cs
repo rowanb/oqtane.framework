@@ -14,27 +14,31 @@ namespace Oqtane.Services
     {
         private readonly HttpClient http;
         private readonly SiteState sitestate;
+        private readonly NavigationManager NavigationManager;
 
-        public ModuleDefinitionService(HttpClient http, SiteState sitestate)
+        public ModuleDefinitionService(HttpClient http, SiteState sitestate, NavigationManager NavigationManager)
         {
             this.http = http;
             this.sitestate = sitestate;
+            this.NavigationManager = NavigationManager;
         }
 
         private string apiurl
         {
-            get { return CreateApiUrl(sitestate.Alias, "ModuleDefinition"); }
+            get { return CreateApiUrl(sitestate.Alias, NavigationManager.Uri, "ModuleDefinition"); }
         }
 
-        public async Task<List<ModuleDefinition>> GetModuleDefinitionsAsync()
+        public async Task<List<ModuleDefinition>> GetModuleDefinitionsAsync(int SiteId)
         {
-            List<ModuleDefinition> moduledefinitions = await http.GetJsonAsync<List<ModuleDefinition>>(apiurl);
+            // get list of modules from the server
+            List<ModuleDefinition> moduledefinitions = await http.GetJsonAsync<List<ModuleDefinition>>(apiurl + "?siteid=" + SiteId.ToString());
 
-            // get list of loaded assemblies
+            // get list of loaded assemblies on the client ( in the client-side hosting module the browser client has its own app domain )
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
             foreach (ModuleDefinition moduledefinition in moduledefinitions)
             {
+                // if a module has dependencies, check if they are loaded
                 if (moduledefinition.Dependencies != "")
                 {
                     foreach (string dependency in moduledefinition.Dependencies.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
@@ -43,20 +47,31 @@ namespace Oqtane.Services
                         if (assemblies.Where(item => item.FullName.StartsWith(assemblyname + ",")).FirstOrDefault() == null)
                         {
                             // download assembly from server and load
-                            var bytes = await http.GetByteArrayAsync("_framework/_bin/" + assemblyname + ".dll");
+                            var bytes = await http.GetByteArrayAsync(apiurl + "/" + assemblyname + ".dll");
                             Assembly.Load(bytes);
                         }
                     }
                 }
+                // check if the module assembly is loaded
                 if (assemblies.Where(item => item.FullName.StartsWith(moduledefinition.AssemblyName + ",")).FirstOrDefault() == null)
                 {
                     // download assembly from server and load
-                    var bytes = await http.GetByteArrayAsync("_framework/_bin/" + moduledefinition.AssemblyName + ".dll");
+                    var bytes = await http.GetByteArrayAsync(apiurl + "/" + moduledefinition.AssemblyName + ".dll");
                     Assembly.Load(bytes);
                 }
             }
 
             return moduledefinitions.OrderBy(item => item.Name).ToList();
+        }
+
+        public async Task UpdateModuleDefinitionAsync(ModuleDefinition ModuleDefinition)
+        {
+            await http.PutJsonAsync(apiurl + "/" + ModuleDefinition.ModuleDefinitionId.ToString(), ModuleDefinition);
+        }
+
+        public async Task InstallModulesAsync()
+        {
+            await http.GetJsonAsync<List<string>>(apiurl + "/install");
         }
     }
 }

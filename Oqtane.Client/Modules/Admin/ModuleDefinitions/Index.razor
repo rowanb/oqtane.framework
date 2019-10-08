@@ -1,9 +1,5 @@
-﻿@using Oqtane.Services
-@using Oqtane.Models
-@using Oqtane.Modules
-@using Oqtane.Client.Modules.Controls
+﻿@namespace Oqtane.Modules.Admin.ModuleDefinitions
 @inherits ModuleBase
-
 @inject IModuleDefinitionService ModuleDefinitionService
 
 @if (moduledefinitions == null)
@@ -12,30 +8,31 @@
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Name</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var moduledefinition in moduledefinitions)
-            {
-                <tr>
-                    <td>@moduledefinition.Name</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <ActionLink Action="Add" Text="Install Module" Style="float: right; margin: 10px;" />
+
+    <Pager Items="@moduledefinitions">
+        <Header>
+            <th>Name</th>
+            <th>Version</th>
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
+        </Header>
+        <Row>
+            <td>@context.Name</td>
+            <td>@context.Version</td>
+            <td><ActionLink Action="Edit" Parameters="@($"id=" + context.ModuleDefinitionId.ToString())" /></td>
+            <td><ActionLink Action="Delete" Parameters="@($"id=" + context.ModuleDefinitionId.ToString())" Class="btn btn-danger" /></td>
+        </Row>
+    </Pager>
 }
 
 @code {
-    public override SecurityAccessLevelEnum SecurityAccessLevel { get { return SecurityAccessLevelEnum.Host; } }
+    public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Host; } }
 
     List<ModuleDefinition> moduledefinitions;
 
-    protected override async Task OnInitAsync()
+    protected override async Task OnInitializedAsync()
     {
-        moduledefinitions = await ModuleDefinitionService.GetModuleDefinitionsAsync();
+        moduledefinitions = await ModuleDefinitionService.GetModuleDefinitionsAsync(PageState.Site.SiteId);
     }
 }

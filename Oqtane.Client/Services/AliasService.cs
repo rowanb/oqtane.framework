@@ -11,17 +11,19 @@ namespace Oqtane.Services
     public class AliasService : ServiceBase, IAliasService
     {
         private readonly HttpClient http;
-        private readonly IUriHelper urihelper;
+        private readonly SiteState sitestate;
+        private readonly NavigationManager NavigationManager;
 
-        public AliasService(HttpClient http, IUriHelper urihelper)
+        public AliasService(HttpClient http, SiteState sitestate, NavigationManager NavigationManager)
         {
             this.http = http;
-            this.urihelper = urihelper;
+            this.sitestate = sitestate;
+            this.NavigationManager = NavigationManager;
         }
 
         private string apiurl
         {
-            get { return CreateApiUrl(urihelper.GetAbsoluteUri(), "Alias"); }
+            get { return CreateApiUrl(sitestate.Alias, NavigationManager.Uri, "Alias"); }
         }
 
         public async Task<List<Alias>> GetAliasesAsync()
@@ -32,18 +34,17 @@ namespace Oqtane.Services
 
         public async Task<Alias> GetAliasAsync(int AliasId)
         {
-            List<Alias> aliases = await http.GetJsonAsync<List<Alias>>(apiurl);
-            return aliases.Where(item => item.AliasId == AliasId).FirstOrDefault();
+            return await http.GetJsonAsync<Alias>(apiurl + "/" + AliasId.ToString());
         }
 
-        public async Task AddAliasAsync(Alias alias)
+        public async Task<Alias> AddAliasAsync(Alias alias)
         {
-            await http.PostJsonAsync(apiurl, alias);
+            return await http.PostJsonAsync<Alias>(apiurl, alias);
         }
 
-        public async Task UpdateAliasAsync(Alias alias)
+        public async Task<Alias> UpdateAliasAsync(Alias alias)
         {
-            await http.PutJsonAsync(apiurl + "/" + alias.AliasId.ToString(), alias);
+            return await http.PutJsonAsync<Alias>(apiurl + "/" + alias.AliasId.ToString(), alias);
         }
         public async Task DeleteAliasAsync(int AliasId)
         {

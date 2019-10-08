@@ -12,16 +12,18 @@ namespace Oqtane.Services
     {
         private readonly HttpClient http;
         private readonly SiteState sitestate;
+        private readonly NavigationManager NavigationManager;
 
-        public ModuleService(HttpClient http, SiteState sitestate)
+        public ModuleService(HttpClient http, SiteState sitestate, NavigationManager NavigationManager)
         {
             this.http = http;
             this.sitestate = sitestate;
+            this.NavigationManager = NavigationManager;
         }
 
         private string apiurl
         {
-            get { return CreateApiUrl(sitestate.Alias, "Module"); }
+            get { return CreateApiUrl(sitestate.Alias, NavigationManager.Uri, "Module"); }
         }
 
         public async Task<List<Module>> GetModulesAsync(int PageId)
@@ -39,14 +41,19 @@ namespace Oqtane.Services
             return modules.ToList();
         }
 
-        public async Task AddModuleAsync(Module module)
+        public async Task<Module> GetModuleAsync(int ModuleId)
         {
-            await http.PostJsonAsync(apiurl, module);
+            return await http.GetJsonAsync<Module>(apiurl + "/" + ModuleId.ToString());
         }
 
-        public async Task UpdateModuleAsync(Module module)
+        public async Task<Module> AddModuleAsync(Module Module)
         {
-            await http.PutJsonAsync(apiurl + "/" + module.ModuleId.ToString(), module);
+            return await http.PostJsonAsync<Module>(apiurl, Module);
+        }
+
+        public async Task<Module> UpdateModuleAsync(Module Module)
+        {
+            return await http.PutJsonAsync<Module>(apiurl + "/" + Module.ModuleId.ToString(), Module);
         }
 
         public async Task DeleteModuleAsync(int ModuleId)

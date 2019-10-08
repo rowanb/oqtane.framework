@@ -1,40 +1,34 @@
-﻿@using Oqtane.Services
-@using Oqtane.Models
-@using Oqtane.Modules
+﻿@namespace Oqtane.Modules.Admin.Themes
 @inherits ModuleBase
-
 @inject IThemeService ThemeService
 
-@if (Themes == null)
+@if (themes == null)
 {
     <p><em>Loading...</em></p>
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Name</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var theme in Themes)
-            {
-                <tr>
-                    <td>@theme.Name</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <ActionLink Action="Add" Text="Install Theme" Style="float: right; margin: 10px;" />
+
+    <Pager Items="@themes">
+        <Header>
+            <th>Name</th>
+            <th>Version</th>
+        </Header>
+        <Row>
+            <td>@context.Name</td>
+            <td>@context.Version</td>
+        </Row>
+    </Pager>
 }
 
 @code {
-    public override SecurityAccessLevelEnum SecurityAccessLevel { get { return SecurityAccessLevelEnum.Host; } }
+    public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Host; } }
 
-    List<Theme> Themes;
+    List<Theme> themes;
 
-    protected override async Task OnInitAsync()
+    protected override async Task OnInitializedAsync()
     {
-        Themes = await ThemeService.GetThemesAsync();
+        themes = await ThemeService.GetThemesAsync();
     }
 }

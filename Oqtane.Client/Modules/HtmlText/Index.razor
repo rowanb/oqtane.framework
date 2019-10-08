@@ -1,27 +1,34 @@
-﻿@using Oqtane.Client.Modules.HtmlText.Services
-@using Oqtane.Modules
-@using Oqtane.Shared.Modules.HtmlText.Models
-@using System.Net.Http;
-@using Oqtane.Client.Modules.Controls
-@using Oqtane.Shared;
+﻿@using Oqtane.Modules.HtmlText.Services
+@using Oqtane.Modules.HtmlText.Models
+@namespace Oqtane.Modules.HtmlText
 @inherits ModuleBase
+@inject NavigationManager NavigationManager
 @inject HttpClient http
 @inject SiteState sitestate
 
 @((MarkupString)content)
 
-<br /><ActionLink Action="Edit" /><br /><br />
+<br />
+<ActionLink Action="Edit" />
+<br /><br />
 
 @code {
     string content;
 
-    protected override async Task OnInitAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        HtmlTextService htmltextservice = new HtmlTextService(http, sitestate);
-        List<HtmlTextInfo> htmltext = await htmltextservice.GetHtmlTextAsync(ModuleState.ModuleId);
-        if (htmltext != null)
+        try
         {
-            content = htmltext.FirstOrDefault().Content;
+            HtmlTextService htmltextservice = new HtmlTextService(http, sitestate, NavigationManager);
+            HtmlTextInfo htmltext = await htmltextservice.GetHtmlTextAsync(ModuleState.ModuleId);
+            if (htmltext != null)
+            {
+                content = htmltext.Content;
+            }
+        }
+        catch (Exception ex)
+        {
+            ModuleInstance.AddModuleMessage(ex.Message, MessageType.Error);
         }
     }
 }

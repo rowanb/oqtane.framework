@@ -1,0 +1,37 @@
+﻿@namespace Oqtane.Modules.Admin.Tenants
+@inherits ModuleBase
+@inject ITenantService TenantService
+
+@if (tenants == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <ActionLink Action="Add" Text="Add Tenant" Style="float: right; margin: 10px;" />
+
+    <Pager Items="@tenants">
+        <Header>
+            <th>Name</th>
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
+        </Header>
+        <Row>
+            <td>@context.Name</td>
+            <td><ActionLink Action="Edit" Parameters="@($"id=" + context.TenantId.ToString())" /></td>
+            <td><ActionLink Action="Delete" Parameters="@($"id=" + context.TenantId.ToString())" Class="btn btn-danger" /></td>
+        </Row>
+    </Pager>
+
+}
+
+@code {
+    public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Host; } }
+
+    List<Tenant> tenants;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenants = await TenantService.GetTenantsAsync();
+    }
+}

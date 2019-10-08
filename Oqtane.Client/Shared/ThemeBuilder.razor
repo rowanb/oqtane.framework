@@ -1,0 +1,38 @@
+﻿@namespace Oqtane.Shared
+@inject IJSRuntime jsRuntime
+
+@DynamicComponent
+
+@code {
+    [CascadingParameter] PageState PageState { get; set; }
+
+    RenderFragment DynamicComponent { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        DynamicComponent = builder =>
+        {
+            Type themeType = Type.GetType(PageState.Page.ThemeType);
+            if (themeType != null)
+            {
+                builder.OpenComponent(0, themeType);
+                builder.CloseComponent();
+            }
+            else
+            {
+            // theme does not exist with type specified
+            builder.OpenComponent(0, Type.GetType(Constants.ModuleMessageControl));
+                builder.AddAttribute(1, "Message", "Error Loading Page Theme " + PageState.Page.ThemeType);
+                builder.CloseComponent();
+            }
+        };
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // remove any custom CSS
+        var interop = new Interop(jsRuntime);
+        await interop.RemoveCSS("Theme:");
+        await interop.RemoveCSS("Module:");
+    }
+}

@@ -14,16 +14,18 @@ namespace Oqtane.Services
     {
         private readonly HttpClient http;
         private readonly SiteState sitestate;
+        private readonly NavigationManager NavigationManager;
 
-        public ThemeService(HttpClient http, SiteState sitestate)
+        public ThemeService(HttpClient http, SiteState sitestate, NavigationManager NavigationManager)
         {
             this.http = http;
             this.sitestate = sitestate;
+            this.NavigationManager = NavigationManager;
         }
 
         private string apiurl
         {
-            get { return CreateApiUrl(sitestate.Alias, "Theme"); }
+            get { return CreateApiUrl(sitestate.Alias, NavigationManager.Uri, "Theme"); }
         }
 
         public async Task<List<Theme>> GetThemesAsync()
@@ -43,7 +45,7 @@ namespace Oqtane.Services
                         if (assemblies.Where(item => item.FullName.StartsWith(assemblyname + ",")).FirstOrDefault() == null)
                         {
                             // download assembly from server and load
-                            var bytes = await http.GetByteArrayAsync("_framework/_bin/" + assemblyname + ".dll");
+                            var bytes = await http.GetByteArrayAsync(apiurl + "/" + assemblyname + ".dll");
                             Assembly.Load(bytes);
                         }
                     }
@@ -51,7 +53,7 @@ namespace Oqtane.Services
                 if (assemblies.Where(item => item.FullName.StartsWith(theme.AssemblyName + ",")).FirstOrDefault() == null)
                 {
                     // download assembly from server and load
-                    var bytes = await http.GetByteArrayAsync("_framework/_bin/" + theme.AssemblyName + ".dll");
+                    var bytes = await http.GetByteArrayAsync(apiurl + "/" + theme.AssemblyName + ".dll");
                     Assembly.Load(bytes);
                 }
             }
@@ -96,6 +98,11 @@ namespace Oqtane.Services
                 }
             }
             return selectableContainers;
+        }
+
+        public async Task InstallThemesAsync()
+        {
+            await http.GetJsonAsync<List<string>>(apiurl + "/install");
         }
     }
 }

@@ -1,13 +1,20 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using System;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Oqtane.Models
 {
-    public class Alias
+    public class Alias : IAuditable
     {
         public int AliasId { get; set; }
         public string Name { get; set; }
         public int TenantId { get; set; }
         public int SiteId { get; set; }
+
+        public string CreatedBy { get; set; }
+        public DateTime CreatedOn { get; set; }
+        public string ModifiedBy { get; set; }
+        public DateTime ModifiedOn { get; set; }
+
 
         [NotMapped]
         public string Scheme { get; set; }
@@ -18,6 +25,20 @@ namespace Oqtane.Models
             get
             {
                 return Scheme + "://" + Name;
+            }
+        }
+
+        [NotMapped]
+        public string BaseUrl
+        {
+            get
+            {
+                string name = Name;
+                if (name.Contains("/"))
+                {
+                    name = name.Substring(0, name.IndexOf("/"));
+                }
+                return Scheme + "://" + name;
             }
         }
 
@@ -37,5 +58,40 @@ namespace Oqtane.Models
             }
         }
 
+        [NotMapped]
+        public string TenantRootPath
+        {
+            get
+            {
+                return "Tenants/" + TenantId.ToString() + "/";
+            }
+        }
+
+        [NotMapped]
+        public string TenantRootUrl
+        {
+            get
+            {
+                return BaseUrl + "/Tenants/" + TenantId.ToString() + "/";
+            }
+        }
+
+        [NotMapped]
+        public string SiteRootPath
+        {
+            get
+            {
+                return "Tenants/" + TenantId.ToString() + "/Sites/" + SiteId.ToString() + "/";
+            }
+        }
+
+        [NotMapped]
+        public string SiteRootUrl
+        {
+            get
+            {
+                return BaseUrl + "/Tenants/" + TenantId.ToString() + "/Sites/" + SiteId.ToString() + "/";
+            }
+        }
     }
 }

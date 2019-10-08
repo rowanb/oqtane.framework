@@ -1,5 +1,4 @@
-﻿@using System
-@using Oqtane.Shared
+﻿@namespace Oqtane.Shared
 
 @DynamicComponent
 
@@ -9,7 +8,7 @@
 
     RenderFragment DynamicComponent { get; set; }
 
-    protected override void OnInit()
+    protected override void OnParametersSet()
     {
         DynamicComponent = builder =>
         {

@@ -12,16 +12,18 @@ namespace Oqtane.Services
     {
         private readonly HttpClient http;
         private readonly SiteState sitestate;
+        private readonly NavigationManager NavigationManager;
 
-        public PageModuleService(HttpClient http, SiteState sitestate)
+        public PageModuleService(HttpClient http, SiteState sitestate, NavigationManager NavigationManager)
         {
             this.http = http;
             this.sitestate = sitestate;
+            this.NavigationManager = NavigationManager;
         }
 
         private string apiurl
         {
-            get { return CreateApiUrl(sitestate.Alias, "PageModule"); }
+            get { return CreateApiUrl(sitestate.Alias, NavigationManager.Uri, "PageModule"); }
         }
 
         public async Task<List<PageModule>> GetPageModulesAsync()
@@ -29,14 +31,24 @@ namespace Oqtane.Services
             return await http.GetJsonAsync<List<PageModule>>(apiurl);
         }
 
-        public async Task AddPageModuleAsync(PageModule pagemodule)
+        public async Task<PageModule> GetPageModuleAsync(int PageModuleId)
         {
-            await http.PostJsonAsync(apiurl, pagemodule);
+            return await http.GetJsonAsync<PageModule>(apiurl + "/" + PageModuleId.ToString());
         }
 
-        public async Task UpdatePageModuleAsync(PageModule pagemodule)
+        public async Task<PageModule> AddPageModuleAsync(PageModule PageModule)
         {
-            await http.PutJsonAsync(apiurl + "/" + pagemodule.PageModuleId.ToString(), pagemodule);
+            return await http.PostJsonAsync<PageModule>(apiurl, PageModule);
+        }
+
+        public async Task<PageModule> UpdatePageModuleAsync(PageModule PageModule)
+        {
+            return await http.PutJsonAsync<PageModule>(apiurl + "/" + PageModule.PageModuleId.ToString(), PageModule);
+        }
+
+        public async Task UpdatePageModuleOrderAsync(int PageId, string Pane)
+        {
+            await http.PutJsonAsync(apiurl + "/?pageid=" + PageId.ToString() + "&pane=" + Pane, null);
         }
 
         public async Task DeletePageModuleAsync(int PageModuleId)

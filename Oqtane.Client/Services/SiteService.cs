@@ -12,16 +12,18 @@ namespace Oqtane.Services
     {
         private readonly HttpClient http;
         private readonly SiteState sitestate;
+        private readonly NavigationManager NavigationManager;
 
-        public SiteService(HttpClient http, SiteState sitestate)
+        public SiteService(HttpClient http, SiteState sitestate, NavigationManager NavigationManager)
         {
             this.http = http;
             this.sitestate = sitestate;
+            this.NavigationManager = NavigationManager;
         }
 
         private string apiurl
         {
-            get { return CreateApiUrl(sitestate.Alias, "Site"); }
+            get { return CreateApiUrl(sitestate.Alias, NavigationManager.Uri, "Site"); }
         }
 
         public async Task<List<Site>> GetSitesAsync()
@@ -32,28 +34,19 @@ namespace Oqtane.Services
 
         public async Task<Site> GetSiteAsync(int SiteId)
         {
-            List<Site> sites = await http.GetJsonAsync<List<Site>>(apiurl);
-            Site site;
-            if (sites.Count == 1)
-            {
-                site = sites.FirstOrDefault();
-            }
-            else
-            {
-                site = sites.Where(item => item.SiteId == SiteId).FirstOrDefault();
-            }
-            return site;
+            return await http.GetJsonAsync<Site>(apiurl + "/" + SiteId.ToString());
         }
 
-        public async Task AddSiteAsync(Site site)
+        public async Task<Site> AddSiteAsync(Site Site)
         {
-            await http.PostJsonAsync(apiurl, site);
+            return await http.PostJsonAsync<Site>(apiurl, Site);
         }
 
-        public async Task UpdateSiteAsync(Site site)
+        public async Task<Site> UpdateSiteAsync(Site Site)
         {
-            await http.PutJsonAsync(apiurl + "/" + site.SiteId.ToString(), site);
+            return await http.PutJsonAsync<Site>(apiurl + "/" + Site.SiteId.ToString(), Site);
         }
+
         public async Task DeleteSiteAsync(int SiteId)
         {
             await http.DeleteAsync(apiurl + "/" + SiteId.ToString());

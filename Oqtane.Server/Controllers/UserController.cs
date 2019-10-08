@@ -1,143 +1,231 @@
 ﻿using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Oqtane.Repository;
 using Oqtane.Models;
 using Microsoft.AspNetCore.Identity;
 using System.Threading.Tasks;
+using System.Linq;
+using System.Security.Claims;
+using Oqtane.Shared;
 
 namespace Oqtane.Controllers
 {
     [Route("{site}/api/[controller]")]
     public class UserController : Controller
     {
-        private readonly IUserRepository users;
-        private readonly UserManager<IdentityUser> identityUserManager;
-        private readonly SignInManager<IdentityUser> identitySignInManager;
+        private readonly IUserRepository Users;
+        private readonly IRoleRepository Roles;
+        private readonly IUserRoleRepository UserRoles;
+        private readonly UserManager<IdentityUser> IdentityUserManager;
+        private readonly SignInManager<IdentityUser> IdentitySignInManager;
 
-        public UserController(IUserRepository Users, UserManager<IdentityUser> IdentityUserManager, SignInManager<IdentityUser> IdentitySignInManager)
+        public UserController(IUserRepository Users, IRoleRepository Roles, IUserRoleRepository UserRoles, UserManager<IdentityUser> IdentityUserManager, SignInManager<IdentityUser> IdentitySignInManager)
         {
-            users = Users;
-            identityUserManager = IdentityUserManager;
-            identitySignInManager = IdentitySignInManager;
+            this.Users = Users;
+            this.Roles = Roles;
+            this.UserRoles = UserRoles;
+            this.IdentityUserManager = IdentityUserManager;
+            this.IdentitySignInManager = IdentitySignInManager;
         }
 
-        // GET: api/<controller>
+        // GET: api/<controller>?siteid=x
         [HttpGet]
         public IEnumerable<User> Get()
         {
-            return users.GetUsers();
+            return Users.GetUsers();
         }
 
-        // GET api/<controller>/5
+        // GET api/<controller>/5?siteid=x
         [HttpGet("{id}")]
-        public User Get(int id)
+        public User Get(int id, string siteid)
         {
-            return users.GetUser(id);
-        }
-
-        // POST api/<controller>
-        [HttpPost]
-        public async Task Post([FromBody] User user)
-        {
-            if (ModelState.IsValid)
+            User user = Users.GetUser(id);
+            if (user != null)
             {
-                IdentityUser identityuser = await identityUserManager.FindByNameAsync(user.Username);
-                if (identityuser == null)
-                {
-                    identityuser = new IdentityUser();
-                    identityuser.UserName = user.Username;
-                    identityuser.Email = user.Username;
-                    var result = await identityUserManager.CreateAsync(identityuser, user.Password);
-                    if (result.Succeeded)
-                    {
-                        users.AddUser(user);
-                    }
-                }
-            }
-        }
-
-        // PUT api/<controller>/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody] User user)
-        {
-            if (ModelState.IsValid)
-            {
-                users.UpdateUser(user);
-            }
-        }
-
-        // DELETE api/<controller>/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
-        {
-            users.DeleteUser(id);
-        }
-
-        // GET api/<controller>/current
-        [HttpGet("current")]
-        public User Current()
-        {
-            User user = null;
-            if (User.Identity.IsAuthenticated) 
-            {
-                user = users.GetUser(User.Identity.Name);
-                user.IsAuthenticated = true;
+                user.SiteId = int.Parse(siteid);
+                user.Roles = GetUserRoles(user.UserId, user.SiteId);
             }
             return user;
         }
 
-        // POST api/<controller>/login
-        [HttpPost("login")]
-        public async Task<User> Login([FromBody] User user)
+        // GET api/<controller>/name/x?siteid=x
+        [HttpGet("name/{name}")]
+        public User Get(string name, string siteid)
         {
+            User user = Users.GetUser(name);
+            if (user != null)
+            {
+                user.SiteId = int.Parse(siteid);
+                user.Roles = GetUserRoles(user.UserId, user.SiteId);
+            }
+            return user;
+        }
+
+        // POST api/<controller>
+        [HttpPost]
+        public async Task<User> Post([FromBody] User User)
+        {
+            User user = null;
+
             if (ModelState.IsValid)
             {
-                // seed host user - this logic should be moved to installation
-                IdentityUser identityuser = await identityUserManager.FindByNameAsync("host");
-                if (identityuser == null)
+                int hostroleid = -1;
+                if (!Users.GetUsers().Any())
                 {
-                    var result = await identityUserManager.CreateAsync(new IdentityUser { UserName = "host", Email = "host" }, "password");
-                    if (result.Succeeded)
-                    {
-                        users.AddUser(new Models.User { Username = "host", DisplayName = "host", IsSuperUser = true, Roles = "" });
-                    }
+                    hostroleid = Roles.GetRoles(User.SiteId, true).Where(item => item.Name == Constants.HostRole).FirstOrDefault().RoleId;
                 }
 
-                identityuser = await identityUserManager.FindByNameAsync(user.Username);
-                if (identityuser != null)
+                IdentityUser identityuser = await IdentityUserManager.FindByNameAsync(User.Username);
+                if (identityuser == null)
                 {
-                    var result = await identitySignInManager.CheckPasswordSignInAsync(identityuser, user.Password, false);
+                    identityuser = new IdentityUser();
+                    identityuser.UserName = User.Username;
+                    identityuser.Email = User.Email;
+                    var result = await IdentityUserManager.CreateAsync(identityuser, User.Password);
                     if (result.Succeeded)
                     {
-                        await identitySignInManager.SignInAsync(identityuser, false);
-                        user = users.GetUser(identityuser.UserName);
-                        user.IsAuthenticated = true;
-                    }
-                    else
-                    {
-                        user = null;
+                        user = Users.AddUser(User);
+
+                        // assign to host role if this is the initial installation
+                        if (hostroleid != -1)
+                        {
+                            UserRole userrole = new UserRole();
+                            userrole.UserId = user.UserId;
+                            userrole.RoleId = hostroleid;
+                            userrole.EffectiveDate = null;
+                            userrole.ExpiryDate = null;
+                            UserRoles.AddUserRole(userrole);
+                        }
                     }
                 }
                 else
                 {
-                    user = null;
+                    var result = await IdentitySignInManager.CheckPasswordSignInAsync(identityuser, User.Password, false);
+                    if (result.Succeeded)
+                    {
+                        user = Users.GetUser(User.Username);
+                    }
+                }
+
+                if (user != null && hostroleid == -1)
+                {
+                    // add auto assigned roles to user for site
+                    List<Role> roles = Roles.GetRoles(User.SiteId).Where(item => item.IsAutoAssigned == true).ToList();
+                    foreach (Role role in roles)
+                    {
+                        UserRole userrole = new UserRole();
+                        userrole.UserId = user.UserId;
+                        userrole.RoleId = role.RoleId;
+                        userrole.EffectiveDate = null;
+                        userrole.ExpiryDate = null;
+                        UserRoles.AddUserRole(userrole);
+                    }
                 }
             }
+
+            return user;
+        }
+
+        // PUT api/<controller>/5
+        [HttpPut("{id}")]
+        [Authorize]
+        public async Task<User> Put(int id, [FromBody] User User)
+        {
+            if (ModelState.IsValid)
+            {
+                if (User.Password != "")
+                {
+                    IdentityUser identityuser = await IdentityUserManager.FindByNameAsync(User.Username);
+                    if (identityuser != null)
+                    {
+                        identityuser.PasswordHash = IdentityUserManager.PasswordHasher.HashPassword(identityuser, User.Password);
+                        await IdentityUserManager.UpdateAsync(identityuser);
+                    }
+                }
+                User = Users.UpdateUser(User);
+            }
+            return User;
+        }
+
+        // DELETE api/<controller>/5?siteid=x
+        [HttpDelete("{id}")]
+        [Authorize(Roles = Constants.AdminRole)]
+        public void Delete(int id)
+        {
+            Users.DeleteUser(id);
+        }
+
+        // POST api/<controller>/login
+        [HttpPost("login")]
+        public async Task<User> Login([FromBody] User User, bool SetCookie, bool IsPersistent)
+        {
+            User user = new Models.User { Username = User.Username, IsAuthenticated = false };
+
+            if (ModelState.IsValid)
+            {
+                IdentityUser identityuser = await IdentityUserManager.FindByNameAsync(User.Username);
+                if (identityuser != null)
+                {
+                    var result = await IdentitySignInManager.CheckPasswordSignInAsync(identityuser, User.Password, false);
+                    if (result.Succeeded)
+                    {
+                        user = Users.GetUser(identityuser.UserName);
+                        if (user != null)
+                        {
+                            user.IsAuthenticated = true;
+                            if (SetCookie)
+                            {
+                                await IdentitySignInManager.SignInAsync(identityuser, IsPersistent);
+                            }
+                        }
+                    }
+                }
+            }
+
             return user;
         }
 
         // POST api/<controller>/logout
         [HttpPost("logout")]
-        public async Task Logout([FromBody] User user)
+        [Authorize]
+        public async Task Logout([FromBody] User User)
         {
-            await identitySignInManager.SignOutAsync();
+            await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
         }
 
         // GET api/<controller>/current
         [HttpGet("authenticate")]
         public User Authenticate()
         {
-            return new User { Username = User.Identity.Name, IsAuthenticated = User.Identity.IsAuthenticated };
+            User user = new User();
+            user.Username = User.Identity.Name;
+            user.IsAuthenticated = User.Identity.IsAuthenticated;
+            string roles = "";
+            foreach (var claim in User.Claims.Where(item => item.Type == ClaimTypes.Role))
+            {
+                roles += claim.Value + ";";
+            }
+            if (roles != "") roles = ";" + roles;
+            user.Roles = roles;
+            return user;
+        }
+
+        private string GetUserRoles(int UserId, int SiteId)
+        {
+            string roles = "";
+            List<UserRole> userroles = UserRoles.GetUserRoles(UserId, SiteId).ToList();
+            foreach (UserRole userrole in userroles)
+            {
+                roles += userrole.Role.Name + ";";
+                if (userrole.Role.Name == Constants.HostRole && userroles.Where(item => item.Role.Name == Constants.AdminRole).FirstOrDefault() == null)
+                {
+                    roles += Constants.AdminRole + ";";
+                }
+            }
+            if (roles != "") roles = ";" + roles;
+            return roles;
         }
     }
 }

@@ -1,14 +1,10 @@
-﻿@using Microsoft.AspNetCore.Components.Routing
-@using Oqtane.Models
-@using Oqtane.Services
-@using Oqtane.Modules
-@using Oqtane.Shared
+﻿@namespace Oqtane.Modules.Admin.Pages
 @inherits ModuleBase
-@inject IUriHelper UriHelper
+@inject NavigationManager NavigationManager
 @inject IPageService PageService
 @inject IThemeService  ThemeService
 
-<table class="form-group">
+<table class="table table-borderless">
     <tr>
         <td>
             <label for="Name" class="control-label">Name: </label>
@@ -30,21 +26,39 @@
             <label for="Name" class="control-label">Parent: </label>
         </td>
         <td>
-            <select class="form-control" @bind="@parentid">
-                <option value="">&lt;Select Parent&gt;</option>
-                @foreach (Page p in PageState.Pages)
+            <select class="form-control" @onchange="(e => ParentChanged(e))">
+                <option value="-1">&lt;Site Root&gt;</option>
+                @foreach (Page page in pages)
                 {
-                    <option value="@p.PageId">@p.Name</option>
+                    <option value="@(page.PageId)">@(new string('-', page.Level * 2))@(page.Name)</option>
                 }
             </select>
         </td>
     </tr>
     <tr>
         <td>
-            <label for="Name" class="control-label">Order: </label>
+            <label for="Name" class="control-label">Insert: </label>
         </td>
         <td>
-            <input class="form-control" @bind="@order" />
+            <select class="form-control" @bind="@insert">
+                <option value="<<">At Beginning</option>
+                @if (children != null && children.Count > 0)
+                {
+                    <option value="<">Before</option>
+                    <option value=">">After</option>
+                }
+                <option value=">>">At End</option>
+            </select>
+            @if (children != null && children.Count > 0 && (insert == "<" || insert == ">"))
+            {
+                <select class="form-control" @bind="@childid">
+                    <option value="-1">&lt;Select Page&gt;</option>
+                    @foreach (Page page in children)
+                    {
+                        <option value="@(page.PageId)">@(page.Name)</option>
+                    }
+                </select>
+            }
         </td>
     </tr>
     <tr>
@@ -53,8 +67,19 @@
         </td>
         <td>
             <select class="form-control" @bind="@isnavigation">
-                <option value="true">Yes</option>
-                <option value="false">No</option>
+                <option value="True">Yes</option>
+                <option value="False">No</option>
+            </select>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <label for="Name" class="control-label">Default Mode? </label>
+        </td>
+        <td>
+            <select class="form-control" @bind="@mode">
+                <option value="view">View Mode</option>
+                <option value="edit">Edit Mode</option>
             </select>
         </td>
     </tr>
@@ -96,80 +121,160 @@
     </tr>
     <tr>
         <td>
-            <label for="Name" class="control-label">View Permissions: </label>
+            <label for="Name" class="control-label">Permissions: </label>
         </td>
         <td>
-            <input class="form-control" @bind="@viewpermissions" />
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <label for="Name" class="control-label">Edit Permissions: </label>
-        </td>
-        <td>
-            <input class="form-control" @bind="@editpermissions" />
+            <PermissionGrid EntityName="Page" Permissions="@permissions" @ref="permissiongrid" />
         </td>
     </tr>
 </table>
-<button class="btn btn-success" @onclick="@SavePage">Save</button>
+<button type="button" class="btn btn-success" @onclick="SavePage">Save</button>
 <NavLink class="btn btn-secondary" href="@NavigateUrl()">Cancel</NavLink>
 
 @code {
-    public override SecurityAccessLevelEnum SecurityAccessLevel { get { return SecurityAccessLevelEnum.Admin; } }
+    public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Admin; } }
 
     Dictionary<string, string> themes = new Dictionary<string, string>();
     Dictionary<string, string> panelayouts = new Dictionary<string, string>();
 
+    List<Page> pages;
     string name;
-    string path;
+    string path = "";
     string parentid;
-    string order = "";
+    string insert = ">>";
+    List<Page> children;
+    int childid = -1;
     string isnavigation = "True";
-    string themetype;
+    string mode = "view";
+    string themetype = "";
     string layouttype = "";
     string icon = "";
-    string viewpermissions = "All Users";
-    string editpermissions = "Administrators";
+    string permissions = ""; // need to set default permissions
 
-    protected override void OnInit()
+    PermissionGrid permissiongrid;
+
+    protected override void OnInitialized()
     {
-        themes = ThemeService.GetThemeTypes(PageState.Themes);
-        panelayouts = ThemeService.GetPaneLayoutTypes(PageState.Themes);
+        try
+        {
+            pages = PageState.Pages;
+            children = PageState.Pages.Where(item => item.ParentId == null).ToList();
+
+            themes = ThemeService.GetThemeTypes(PageState.Themes);
+            panelayouts = ThemeService.GetPaneLayoutTypes(PageState.Themes);
+
+            themetype = PageState.Site.DefaultThemeType;
+            layouttype = PageState.Site.DefaultLayoutType;
+
+            List<PermissionString> permissionstrings = new List<PermissionString>();
+            permissionstrings.Add(new PermissionString { PermissionName = "View", Permissions = Constants.AdminRole });
+            permissionstrings.Add(new PermissionString { PermissionName = "Edit", Permissions = Constants.AdminRole });
+            permissions = UserSecurity.SetPermissionStrings(permissionstrings);
+        }
+        catch (Exception ex)
+        {
+            ModuleInstance.AddModuleMessage(ex.Message, MessageType.Error);
+        }
+    }
+
+    private void ParentChanged(ChangeEventArgs e)
+    {
+        try
+        {
+            parentid = (string)e.Value;
+            if (parentid == "-1")
+            {
+                children = PageState.Pages.Where(item => item.ParentId == null).ToList();
+            }
+            else
+            {
+                children = PageState.Pages.Where(item => item.ParentId == int.Parse(parentid)).ToList();
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ModuleInstance.AddModuleMessage(ex.Message, MessageType.Error);
+        }
     }
 
     private async Task SavePage()
     {
-        Page p = new Page();
-        p.SiteId = PageState.Page.SiteId;
-        if (string.IsNullOrEmpty(parentid))
+        try
         {
-            p.ParentId = null;
+            Page page = new Page();
+            page.SiteId = PageState.Page.SiteId;
+            page.Name = name;
+            if (path == "")
+            {
+                path = name;
+            }
+            if (path.Contains("/"))
+            {
+                path = path.Substring(path.LastIndexOf("/") + 1);
+            }
+            if (string.IsNullOrEmpty(parentid))
+            {
+                page.ParentId = null;
+                page.Path = Utilities.GetFriendlyUrl(path);
+            }
+            else
+            {
+                page.ParentId = Int32.Parse(parentid);
+                Page parent = PageState.Pages.Where(item => item.PageId == page.ParentId).FirstOrDefault();
+                if (parent.Path == "")
+                {
+                    page.Path = Utilities.GetFriendlyUrl(parent.Name) + "/" + Utilities.GetFriendlyUrl(path);
+                }
+                else
+                {
+                    page.Path = parent.Path + "/" + Utilities.GetFriendlyUrl(path);
+                }
+            }
+            Page child;
+            switch (insert)
+            {
+                case "<<":
+                    page.Order = 0;
+                    break;
+                case "<":
+                    child = PageState.Pages.Where(item => item.PageId == childid).FirstOrDefault();
+                    page.Order = child.Order - 1;
+                    break;
+                case ">":
+                    child = PageState.Pages.Where(item => item.PageId == childid).FirstOrDefault();
+                    page.Order = child.Order + 1;
+                    break;
+                case ">>":
+                    page.Order = int.MaxValue;
+                    break;
+            }
+            page.IsNavigation = (isnavigation == null ? true : Boolean.Parse(isnavigation));
+            page.EditMode = (mode == "edit" ? true : false);
+            page.ThemeType = themetype;
+            page.LayoutType = (layouttype == null ? "" : layouttype);
+            page.Icon = (icon == null ? "" : icon);
+            Type type;
+            if (!string.IsNullOrEmpty(layouttype))
+            {
+                type = Type.GetType(layouttype);
+            }
+            else
+            {
+                type = Type.GetType(themetype);
+            }
+            System.Reflection.PropertyInfo property = type.GetProperty("Panes");
+            page.Panes = (string)property.GetValue(Activator.CreateInstance(type), null);
+            page.Permissions = permissiongrid.GetPermissions();
+            await PageService.AddPageAsync(page);
+            await PageService.UpdatePageOrderAsync(page.SiteId, page.ParentId);
+
+            NavigationManager.NavigateTo(NavigateUrl(page.Path, Reload.Site));
         }
-        else
+        catch (Exception ex)
         {
-            p.ParentId = Int32.Parse(parentid);
+            ModuleInstance.AddModuleMessage(ex.Message, MessageType.Error);
         }
-        p.Name = name;
-        p.Path = path;
-        p.Order = (order == null ? 1 : Int32.Parse(order));
-        p.IsNavigation = (isnavigation == null ? true : Boolean.Parse(isnavigation));
-        p.ThemeType = themetype;
-        p.LayoutType = (layouttype == null ? "" : layouttype);
-        p.Icon = (icon == null ? "" : icon);
-        Type type;
-        if (!string.IsNullOrEmpty(layouttype))
-        {
-            type = Type.GetType(layouttype);
-        }
-        else
-        {
-            type = Type.GetType(themetype);
-        }
-        System.Reflection.PropertyInfo property = type.GetProperty("Panes");
-        p.Panes = (string)property.GetValue(Activator.CreateInstance(type), null);
-        p.ViewPermissions = viewpermissions;
-        p.EditPermissions = editpermissions;
-        await PageService.AddPageAsync(p);
-        UriHelper.NavigateTo(NavigateUrl(path, true));
     }
+
 }
