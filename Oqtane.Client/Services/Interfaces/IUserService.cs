@@ -6,13 +6,13 @@ namespace Oqtane.Services
 {
     public interface IUserService
     {
-        Task<List<User>> GetUsersAsync();
-
         Task<User> GetUserAsync(int UserId, int SiteId);
 
         Task<User> GetUserAsync(string Username, int SiteId);
 
         Task<User> AddUserAsync(User User);
+
+        Task<User> AddUserAsync(User User, Alias Alias);
 
         Task<User> UpdateUserAsync(User User);
 
@@ -20,6 +20,12 @@ namespace Oqtane.Services
 
         Task<User> LoginUserAsync(User User, bool SetCookie, bool IsPersistent);
 
-        Task LogoutUserAsync();
+        Task LogoutUserAsync(User User);
+
+        Task<User> VerifyEmailAsync(User User, string Token);
+
+        Task ForgotPasswordAsync(User User);
+
+        Task<User> ResetPasswordAsync(User User, string Token);
     }
 }

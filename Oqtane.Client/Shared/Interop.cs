@@ -1,4 +1,6 @@
-﻿using Microsoft.JSInterop;
+﻿using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
+using System;
 using System.Threading.Tasks;
 
 namespace Oqtane.Shared
@@ -41,28 +43,13 @@ namespace Oqtane.Shared
             }
         }
 
-        public Task AddCSS(string id, string url)
+        public Task IncludeCSS(string id, string url)
         {
             try
             {
                 jsRuntime.InvokeAsync<string>(
-                    "interop.addCSS",
+                    "interop.includeCSS",
                     id, url);
-                return Task.CompletedTask;
-            }
-            catch
-            {
-                return Task.CompletedTask;
-            }
-        }
-
-        public Task RemoveCSS(string pattern)
-        {
-            try
-            {
-                jsRuntime.InvokeAsync<string>(
-                    "interop.removeCSS",
-                    pattern);
                 return Task.CompletedTask;
             }
             catch
@@ -100,13 +87,27 @@ namespace Oqtane.Shared
             }
         }
 
-        public Task UploadFiles(string posturl, string folder, string name)
+        public ValueTask<string[]> GetFiles(string id)
+        {
+            try
+            {
+                return jsRuntime.InvokeAsync<string[]>(
+                    "interop.getFiles",
+                    id);
+            }
+            catch
+            {
+                return new ValueTask<string[]>(Task.FromResult(new string[0]));
+            }
+        }
+
+        public Task UploadFiles(string posturl, string folder, string id)
         {
             try
             {
                 jsRuntime.InvokeAsync<string>(
                 "interop.uploadFiles",
-                posturl, folder, name);
+                posturl, folder, id);
                 return Task.CompletedTask;
             }
             catch

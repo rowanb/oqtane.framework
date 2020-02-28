@@ -51,8 +51,13 @@ namespace Oqtane.Client
             services.AddScoped<IRoleService, RoleService>();
             services.AddScoped<IUserRoleService, UserRoleService>();
             services.AddScoped<ISettingService, SettingService>();
-            services.AddScoped<IFileService, FileService>();
             services.AddScoped<IPackageService, PackageService>();
+            services.AddScoped<ILogService, LogService>();
+            services.AddScoped<IJobService, JobService>();
+            services.AddScoped<IJobLogService, JobLogService>();
+            services.AddScoped<INotificationService, NotificationService>();
+            services.AddScoped<IFolderService, FolderService>();
+            services.AddScoped<IFileService, FileService>();
 
             // dynamically register module contexts and repository services
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
@@ -78,7 +83,6 @@ namespace Oqtane.Client
 
         public void Configure(IComponentsApplicationBuilder app)
         {
-            WebAssemblyHttpMessageHandler.DefaultCredentials = FetchCredentialsOption.Include;
             app.AddComponent<App>("app");
         }
 #endif

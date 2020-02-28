@@ -4,41 +4,58 @@
 
 @if (authorized)
 {
-    <NavLink class="@classname" href="@url" style="@style">@text</NavLink>
+    if (Disabled)
+    {
+        <NavLink class="@classname" href="@url" style="@style" disabled>@text</NavLink>
+    }
+    else
+    {
+        <NavLink class="@classname" href="@url" style="@style">@text</NavLink>
+    }
 }
 
 @code {
     [Parameter]
-    public string Action { get; set; }
+    public string Action { get; set; } // required
 
     [Parameter]
-    public string Text { get; set; } // optional
+    public SecurityAccessLevel? Security { get; set; } // optional - can be used to explicitly specify SecurityAccessLevel
 
     [Parameter]
-    public string Parameters { get; set; } // optional
+    public string Text { get; set; } // optional - defaults to Action if not specified
 
     [Parameter]
-    public string Class { get; set; } // optional
+    public string Parameters { get; set; } // optional - querystring parameter should be in the form of "id=x&name=y"
+
+    [Parameter]
+    public string Class { get; set; } // optional - defaults to primary if not specified
 
     [Parameter]
     public string Style { get; set; } // optional
+
+	[Parameter]
+	public bool Disabled { get; set; } // optional
+	
+    [Parameter]
+    public string EditMode { get; set; } // optional - specifies if a user must be in edit mode to see the action - default is true
 
     string text = "";
     string url = "";
     string parameters = "";
     string classname = "btn btn-primary";
     string style = "";
+    bool editmode = true;
     bool authorized = false;
 
     protected override void OnParametersSet()
     {
         text = Action;
-        if (!String.IsNullOrEmpty(Text))
+        if (!string.IsNullOrEmpty(Text))
         {
             text = Text;
         }
 
-        if (!String.IsNullOrEmpty(Parameters))
+        if (!string.IsNullOrEmpty(Parameters))
         {
             parameters = Parameters;
         }
@@ -53,40 +70,59 @@
             style = Style;
         }
 
-        url = EditUrl(Action, parameters);
-
-        if (PageState.EditMode)
+        if (!string.IsNullOrEmpty(EditMode))
         {
-            string typename = ModuleState.ModuleType.Replace(Utilities.GetTypeNameClass(ModuleState.ModuleType) + ",", Action + ",");
-            Type moduleType = Type.GetType(typename);
-            if (moduleType != null)
+            editmode = bool.Parse(EditMode);
+        }
+
+        url = EditUrl(Action, parameters);
+        authorized = IsAuthorized();
+    }
+
+    private bool IsAuthorized()
+    {
+        bool authorized = false;
+        if (PageState.EditMode || !editmode)
+        {
+            SecurityAccessLevel security = SecurityAccessLevel.Host;
+            if (Security == null)
             {
-                var moduleobject = Activator.CreateInstance(moduleType);
-                SecurityAccessLevel SecurityAccessLevel = (SecurityAccessLevel)moduleType.GetProperty("SecurityAccessLevel").GetValue(moduleobject, null);
-                switch (SecurityAccessLevel)
+                string typename = ModuleState.ModuleType.Replace(Utilities.GetTypeNameLastSegment(ModuleState.ModuleType, 0) + ",", Action + ",");
+                Type moduleType = Type.GetType(typename);
+                if (moduleType != null)
                 {
-                    case SecurityAccessLevel.Anonymous:
-                        authorized = true;
-                        break;
-                    case SecurityAccessLevel.View:
-                        authorized = UserSecurity.IsAuthorized(PageState.User, "View", ModuleState.Permissions);
-                        break;
-                    case SecurityAccessLevel.Edit:
-                        authorized = UserSecurity.IsAuthorized(PageState.User, "Edit", ModuleState.Permissions);
-                        break;
-                    case SecurityAccessLevel.Admin:
-                        authorized = UserSecurity.IsAuthorized(PageState.User, Constants.AdminRole);
-                        break;
-                    case SecurityAccessLevel.Host:
-                        authorized = UserSecurity.IsAuthorized(PageState.User, Constants.HostRole);
-                        break;
+                    var moduleobject = Activator.CreateInstance(moduleType);
+                    security = (SecurityAccessLevel)moduleType.GetProperty("SecurityAccessLevel").GetValue(moduleobject, null);
+                }
+                else
+                {
+                    security = SecurityAccessLevel.Anonymous; // occurs when an action does not have a corresponding module control
+                    Class = "btn btn-warning"; // alert developer of missing module comtrol
                 }
             }
             else
             {
-                authorized = true; // occurs when an action does not have a corresponding module control
-                classname = "btn btn-warning"; // alert developer of missing module comtrol
+                security = Security.Value;
+            }
+            switch (security)
+            {
+                case SecurityAccessLevel.Anonymous:
+                    authorized = true;
+                    break;
+                case SecurityAccessLevel.View:
+                    authorized = UserSecurity.IsAuthorized(PageState.User, "View", ModuleState.Permissions);
+                    break;
+                case SecurityAccessLevel.Edit:
+                    authorized = UserSecurity.IsAuthorized(PageState.User, "Edit", ModuleState.Permissions);
+                    break;
+                case SecurityAccessLevel.Admin:
+                    authorized = UserSecurity.IsAuthorized(PageState.User, Constants.AdminRole);
+                    break;
+                case SecurityAccessLevel.Host:
+                    authorized = UserSecurity.IsAuthorized(PageState.User, Constants.HostRole);
+                    break;
             }
         }
+        return authorized;
     }
 }

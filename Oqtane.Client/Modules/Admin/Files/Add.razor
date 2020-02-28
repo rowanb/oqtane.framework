@@ -1,0 +1,110 @@
+﻿@namespace Oqtane.Modules.Admin.Files
+@inherits ModuleBase
+@inject NavigationManager NavigationManager
+@inject IFileService FileService
+@inject IFolderService FolderService
+
+@if (folders != null)
+{
+    <div class="container-fluid">
+        <div class="form-group">
+
+            <ul class="nav nav-tabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-toggle="tab" href="#Upload" role="tab">
+                        Upload Files
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="tab" href="#Download" role="tab">
+                        Download Files
+                    </a>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div id="Upload" class="tab-pane fade show active" role="tabpanel">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td>
+                                <label for="Name" class="control-label">Upload: </label>
+                            </td>
+                            <td>
+                                <FileManager UploadMultiple="true" ShowFiles="false" FolderId="@folderid.ToString()" />
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div id="Download" class="tab-pane fade" role="tabpanel">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td>
+                                <label for="Name" class="control-label">Url: </label>
+                            </td>
+                            <td>
+                                <input class="form-control" @bind="@url" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <label for="Name" class="control-label">Folder: </label>
+                            </td>
+                            <td>
+                                <select class="form-control" @bind="@folderid">
+                                    <option value="-1">&lt;Select Folder&gt;</option>
+                                    @foreach (Folder folder in folders)
+                                    {
+                                        <option value="@(folder.FolderId)">@(new string('-', folder.Level * 2))@(folder.Name)</option>
+                                    }
+                                </select>
+                            </td>
+                        </tr>
+                    </table>
+                    <button type="button" class="btn btn-primary" @onclick="Download">Download</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <br />
+    <NavLink class="btn btn-secondary" href="@NavigateUrl()">Cancel</NavLink>
+}
+
+@code {
+    public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Admin; } }
+
+    string url = "";
+    List<Folder> folders;
+    int folderid = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        folders = await FolderService.GetFoldersAsync(ModuleState.SiteId);
+
+        if (PageState.QueryString.ContainsKey("id"))
+        {
+            folderid = int.Parse(PageState.QueryString["id"]);
+        }
+    }
+
+    private async Task Download()
+    {
+        try
+        {
+            if (url != "" && folderid != -1)
+            {
+                await FileService.UploadFileAsync(url, folderid);
+                await logger.LogInformation("File Downloaded Successfully From Url {Url}", url);
+                AddModuleMessage("File Downloaded Successfully From Url", MessageType.Success);
+            }
+            else
+            {
+                AddModuleMessage("You Must Enter A Url And Select A Folder", MessageType.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Downloading File From Url {Url} {Error}", url, ex.Message);
+            AddModuleMessage("Error Downloading File From Url. Please Verify That The Url Is Valid.", MessageType.Error);
+        }
+    }
+}

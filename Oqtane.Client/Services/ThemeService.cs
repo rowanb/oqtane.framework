@@ -61,40 +61,43 @@ namespace Oqtane.Services
             return themes.OrderBy(item => item.Name).ToList();
         }
 
-        public Dictionary<string, string> GetThemeTypes(List<Theme> themes)
+        public Dictionary<string, string> GetThemeTypes(List<Theme> Themes)
         {
             var selectableThemes = new Dictionary<string, string>();
-            foreach (Theme theme in themes)
+            foreach (Theme theme in Themes)
             {
                 foreach (string themecontrol in theme.ThemeControls.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    selectableThemes.Add(themecontrol, theme.Name + " - " + Utilities.GetTypeNameClass(themecontrol));
+                    selectableThemes.Add(themecontrol, theme.Name + " - " + Utilities.GetTypeNameLastSegment(themecontrol, 0));
                 }
             }
             return selectableThemes;
         }
 
-        public Dictionary<string, string> GetPaneLayoutTypes(List<Theme> themes)
+        public Dictionary<string, string> GetPaneLayoutTypes(List<Theme> Themes, string ThemeName)
         {
             var selectablePaneLayouts = new Dictionary<string, string>();
-            foreach (Theme theme in themes)
-            {
-                foreach (string panelayout in theme.PaneLayouts.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            foreach (Theme theme in Themes)
+            { 
+                if (ThemeName.StartsWith(theme.ThemeName))
                 {
-                    selectablePaneLayouts.Add(panelayout, theme.Name + " - " + @Utilities.GetTypeNameClass(panelayout));
+                    foreach (string panelayout in theme.PaneLayouts.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        selectablePaneLayouts.Add(panelayout, theme.Name + " - " + @Utilities.GetTypeNameLastSegment(panelayout, 0));
+                    }
                 }
             }
             return selectablePaneLayouts;
         }
 
-        public Dictionary<string, string> GetContainerTypes(List<Theme> themes)
+        public Dictionary<string, string> GetContainerTypes(List<Theme> Themes)
         {
             var selectableContainers = new Dictionary<string, string>();
-            foreach (Theme theme in themes)
+            foreach (Theme theme in Themes)
             {
                 foreach (string container in theme.ContainerControls.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    selectableContainers.Add(container, theme.Name + " - " + @Utilities.GetTypeNameClass(container));
+                    selectableContainers.Add(container, theme.Name + " - " + @Utilities.GetTypeNameLastSegment(container, 0));
                 }
             }
             return selectableContainers;
@@ -103,6 +106,11 @@ namespace Oqtane.Services
         public async Task InstallThemesAsync()
         {
             await http.GetJsonAsync<List<string>>(apiurl + "/install");
+        }
+
+        public async Task DeleteThemeAsync(string ThemeName)
+        {
+            await http.DeleteAsync(apiurl + "/" + ThemeName);
         }
     }
 }

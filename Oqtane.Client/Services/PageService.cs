@@ -39,9 +39,19 @@ namespace Oqtane.Services
             return await http.GetJsonAsync<Page>(apiurl + "/" + PageId.ToString());
         }
 
+        public async Task<Page> GetPageAsync(int PageId, int UserId)
+        {
+            return await http.GetJsonAsync<Page>(apiurl + "/" + PageId.ToString() + "?userid=" + UserId.ToString());
+        }
+
         public async Task<Page> AddPageAsync(Page Page)
         {
             return await http.PostJsonAsync<Page>(apiurl, Page);
+        }
+
+        public async Task<Page> AddPageAsync(int PageId, int UserId)
+        {
+            return await http.PostJsonAsync<Page>(apiurl + "/" + PageId.ToString() + "?userid=" + UserId.ToString(), null);
         }
 
         public async Task<Page> UpdatePageAsync(Page Page)
@@ -49,9 +59,9 @@ namespace Oqtane.Services
             return await http.PutJsonAsync<Page>(apiurl + "/" + Page.PageId.ToString(), Page);
         }
 
-        public async Task UpdatePageOrderAsync(int SiteId, int? ParentId)
+        public async Task UpdatePageOrderAsync(int SiteId, int PageId, int? ParentId)
         {
-            await http.PutJsonAsync(apiurl + "/?siteid=" + SiteId.ToString() + "&parentid=" + ((ParentId == null) ? "" : ParentId.ToString()), null);
+            await http.PutJsonAsync(apiurl + "/?siteid=" + SiteId.ToString() + "&pageid=" + PageId.ToString() + "&parentid=" + ((ParentId == null) ? "" : ParentId.ToString()), null);
         }
 
         public async Task DeletePageAsync(int PageId)
@@ -87,6 +97,15 @@ namespace Oqtane.Services
             };
             Pages = Pages.OrderBy(item => item.Order).ToList();
             GetPath(Pages, null);
+
+            // add any non-hierarchical items to the end of the list
+            foreach (Page page in Pages)
+            {
+                if (hierarchy.Find(item => item.PageId == page.PageId) == null)
+                {
+                    hierarchy.Add(page);
+                }
+            }
             return hierarchy;
         }
     }

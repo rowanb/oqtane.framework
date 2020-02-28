@@ -14,9 +14,10 @@ namespace Oqtane.Models
         public string ThemeType { get; set; }
         public string LayoutType { get; set; }
         public string Icon { get; set; }
-        public string Panes { get; set; }
         public bool IsNavigation { get; set; }
         public bool EditMode { get; set; }
+        public int? UserId { get; set; }
+        public bool IsPersonalizable { get; set; }
 
         public string CreatedBy { get; set; }
         public DateTime CreatedOn { get; set; }
@@ -26,6 +27,8 @@ namespace Oqtane.Models
         public DateTime? DeletedOn { get; set; }
         public bool IsDeleted { get; set; }
 
+        [NotMapped]
+        public string Panes { get; set; }
         [NotMapped]
         public string Permissions { get; set; }
         [NotMapped]

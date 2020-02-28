@@ -6,17 +6,19 @@ Create tables
 
 CREATE TABLE [dbo].[Site](
 	[SiteId] [int] IDENTITY(1,1) NOT NULL,
+	[TenantId] [int] NOT NULL,
 	[Name] [nvarchar](200) NOT NULL,
-	[Logo] [nvarchar](50) NOT NULL,
+	[LogoFileId] [int] NULL,
 	[DefaultThemeType] [nvarchar](200) NOT NULL,
 	[DefaultLayoutType] [nvarchar](200) NOT NULL,
+	[DefaultContainerType] [nvarchar](200) NOT NULL,
 	[CreatedBy] [nvarchar](256) NOT NULL,
 	[CreatedOn] [datetime] NOT NULL,
 	[ModifiedBy] [nvarchar](256) NOT NULL,
 	[ModifiedOn] [datetime] NOT NULL,
 	[DeletedBy] [nvarchar](256) NULL,
 	[DeletedOn] [datetime] NULL,
-	[IsDeleted][bit] NOT NULL
+	[IsDeleted][bit] NOT NULL,
   CONSTRAINT [PK_Site] PRIMARY KEY CLUSTERED 
   (
 	[SiteId] ASC
@@ -31,19 +33,20 @@ CREATE TABLE [dbo].[Page](
 	[Name] [nvarchar](50) NOT NULL,
 	[ThemeType] [nvarchar](200) NULL,
 	[Icon] [nvarchar](50) NOT NULL,
-	[Panes] [nvarchar](50) NOT NULL,
 	[ParentId] [int] NULL,
 	[Order] [int] NOT NULL,
 	[IsNavigation] [bit] NOT NULL,
 	[LayoutType] [nvarchar](200) NOT NULL,
 	[EditMode] [bit] NOT NULL,
+	[UserId] [int] NULL,
+	[IsPersonalizable] [bit] NOT NULL,
 	[CreatedBy] [nvarchar](256) NOT NULL,
 	[CreatedOn] [datetime] NOT NULL,
 	[ModifiedBy] [nvarchar](256) NOT NULL,
 	[ModifiedOn] [datetime] NOT NULL,
 	[DeletedBy] [nvarchar](256) NULL,
 	[DeletedOn] [datetime] NULL,
-	[IsDeleted][bit] NOT NULL
+	[IsDeleted][bit] NOT NULL,
   CONSTRAINT [PK_Page] PRIMARY KEY CLUSTERED 
   (
 	[PageId] ASC
@@ -78,6 +81,9 @@ CREATE TABLE [dbo].[PageModule](
 	[CreatedOn] [datetime] NOT NULL,
 	[ModifiedBy] [nvarchar](256) NOT NULL,
 	[ModifiedOn] [datetime] NOT NULL,
+	[DeletedBy] [nvarchar](256) NULL,
+	[DeletedOn] [datetime] NULL,
+	[IsDeleted][bit] NOT NULL,
   CONSTRAINT [PK_PageModule] PRIMARY KEY CLUSTERED 
   (
 	[PageModuleId] ASC
@@ -90,13 +96,16 @@ CREATE TABLE [dbo].[User](
 	[Username] [nvarchar](256) NOT NULL,
 	[DisplayName] [nvarchar](50) NOT NULL,
 	[Email] [nvarchar](256) NOT NULL,
+	[PhotoFileId] [int] NULL,
+	[LastLoginOn] [datetime] NULL,
+	[LastIPAddress] [nvarchar](50) NOT NULL,
 	[CreatedBy] [nvarchar](256) NOT NULL,
 	[CreatedOn] [datetime] NOT NULL,
 	[ModifiedBy] [nvarchar](256) NOT NULL,
 	[ModifiedOn] [datetime] NOT NULL,
 	[DeletedBy] [nvarchar](256) NULL,
 	[DeletedOn] [datetime] NULL,
-	[IsDeleted][bit] NOT NULL
+	[IsDeleted][bit] NOT NULL,
   CONSTRAINT [PK_User] PRIMARY KEY CLUSTERED 
   (
 	[UserId] ASC
@@ -200,6 +209,98 @@ CREATE TABLE [dbo].[Profile](
 
 GO
 
+CREATE TABLE [dbo].[Log] (
+
+   [LogId] [int] IDENTITY(1,1) NOT NULL,
+   [SiteId] [int] NULL,
+   [LogDate] [datetime] NOT NULL,
+   [PageId] [int] NULL,
+   [ModuleId] [int] NULL,
+   [UserId] [int] NULL,
+   [Url] [nvarchar](2048) NOT NULL,
+   [Server] [nvarchar](200) NOT NULL,
+   [Category] [nvarchar](200) NOT NULL,
+   [Feature] [nvarchar](200) NOT NULL,
+   [Function] [nvarchar](20) NOT NULL,
+   [Level] [nvarchar](20) NOT NULL,
+   [Message] [nvarchar](max) NOT NULL,
+   [MessageTemplate] [nvarchar](max) NOT NULL,
+   [Exception] [nvarchar](max) NULL,
+   [Properties] [nvarchar](max) NULL
+
+   CONSTRAINT [PK_Log] PRIMARY KEY CLUSTERED 
+   (
+     [LogId] ASC
+   ) 
+)
+GO
+
+CREATE TABLE [dbo].[Notification](
+	[NotificationId] [int] IDENTITY(1,1) NOT NULL,
+    [SiteId] [int] NOT NULL,
+	[FromUserId] [int] NULL,
+	[ToUserId] [int] NULL,
+	[ToEmail] [nvarchar](256) NOT NULL,
+	[Subject] [nvarchar](256) NOT NULL,
+	[Body] [nvarchar](max) NOT NULL,
+	[ParentId] [int] NULL,
+	[CreatedOn] [datetime] NOT NULL,
+	[IsDelivered] [bit] NOT NULL,
+	[DeliveredOn] [datetime] NULL,
+	[DeletedBy] [nvarchar](256) NULL,
+	[DeletedOn] [datetime] NULL,
+	[IsDeleted][bit] NOT NULL,
+  CONSTRAINT [PK_Notification] PRIMARY KEY CLUSTERED 
+  (
+	[NotificationId] ASC
+  )
+)
+GO
+
+CREATE TABLE [dbo].[Folder](
+	[FolderId] [int] IDENTITY(1,1) NOT NULL,
+	[SiteId] [int] NOT NULL,
+	[Path] [nvarchar](50) NOT NULL,
+	[Name] [nvarchar](50) NOT NULL,
+	[ParentId] [int] NULL,
+	[Order] [int] NOT NULL,
+	[IsSystem] [bit] NOT NULL,
+	[CreatedBy] [nvarchar](256) NOT NULL,
+	[CreatedOn] [datetime] NOT NULL,
+	[ModifiedBy] [nvarchar](256) NOT NULL,
+	[ModifiedOn] [datetime] NOT NULL,
+	[DeletedBy] [nvarchar](256) NULL,
+	[DeletedOn] [datetime] NULL,
+	[IsDeleted][bit] NOT NULL,
+  CONSTRAINT [PK_Folder] PRIMARY KEY CLUSTERED 
+  (
+	[FolderId] ASC
+  )
+)
+GO
+
+CREATE TABLE [dbo].[File](
+	[FileId] [int] IDENTITY(1,1) NOT NULL,
+	[FolderId] [int] NOT NULL,
+	[Name] [nvarchar](250) NOT NULL,
+	[Extension] [nvarchar](50) NOT NULL,
+	[Size] [int] NOT NULL,
+	[ImageHeight] [int] NOT NULL,
+	[ImageWidth] [int] NOT NULL,
+	[CreatedBy] [nvarchar](256) NOT NULL,
+	[CreatedOn] [datetime] NOT NULL,
+	[ModifiedBy] [nvarchar](256) NOT NULL,
+	[ModifiedOn] [datetime] NOT NULL,
+	[DeletedBy] [nvarchar](256) NULL,
+	[DeletedOn] [datetime] NULL,
+	[IsDeleted][bit] NOT NULL,
+  CONSTRAINT [PK_File] PRIMARY KEY CLUSTERED 
+  (
+	[FileId] ASC
+  )
+)
+GO
+
 CREATE TABLE [dbo].[HtmlText](
 	[HtmlTextId] [int] IDENTITY(1,1) NOT NULL,
 	[ModuleId] [int] NOT NULL,
@@ -271,6 +372,26 @@ REFERENCES [dbo].[Site] ([SiteId])
 ON DELETE CASCADE
 GO
 
+ALTER TABLE [dbo].[Log] WITH CHECK ADD CONSTRAINT [FK_Log_Site] FOREIGN KEY([SiteId])
+REFERENCES [dbo].[Site] ([SiteId])
+ON DELETE CASCADE
+GO
+
+ALTER TABLE [dbo].[Notification] WITH CHECK ADD CONSTRAINT [FK_Notification_Site] FOREIGN KEY([SiteId])
+REFERENCES [dbo].[Site] ([SiteId])
+ON DELETE CASCADE
+GO
+
+ALTER TABLE [dbo].[Folder] WITH CHECK ADD CONSTRAINT [FK_Folder_Site] FOREIGN KEY([SiteId])
+REFERENCES [dbo].[Site] ([SiteId])
+ON DELETE CASCADE
+GO
+
+ALTER TABLE [dbo].[File] WITH CHECK ADD CONSTRAINT [FK_File_Folder] FOREIGN KEY([FolderId])
+REFERENCES [dbo].[Folder] ([FolderId])
+ON DELETE CASCADE
+GO
+
 ALTER TABLE [dbo].[HtmlText] WITH CHECK ADD CONSTRAINT [FK_HtmlText_Module] FOREIGN KEY([ModuleId])
 REFERENCES [dbo].[Module] ([ModuleId])
 ON DELETE CASCADE
@@ -311,7 +432,8 @@ GO
 CREATE UNIQUE NONCLUSTERED INDEX IX_Page ON dbo.Page
 	(
 	SiteId,
-	[Path]
+	[Path],
+	UserId
 	) ON [PRIMARY]
 GO
 
@@ -322,3 +444,9 @@ CREATE UNIQUE NONCLUSTERED INDEX IX_UserRole ON dbo.UserRole
 	) ON [PRIMARY]
 GO
 
+CREATE UNIQUE NONCLUSTERED INDEX IX_Folder ON dbo.Folder
+	(
+	SiteId,
+	[Path]
+	) ON [PRIMARY]
+GO

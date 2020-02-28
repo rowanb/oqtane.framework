@@ -11,15 +11,14 @@
             <label for="Name" class="control-label">Theme: </label>
         </td>
         <td>
-            <FileUpload Filter=".nupkg"></FileUpload>
+            <FileManager Filter="nupkg" ShowFiles="false" Folder="Themes" />
         </td>
     </tr>
 </table>
-<button type="button" class="btn btn-primary" @onclick="UploadTheme">Upload Theme</button>
 
 @if (packages != null)
 {
-    <hr />
+    <hr class="app-rule" />
     <div class="mx-auto text-center"><h2>Available Themes</h2></div>
 
     <Pager Items="@packages">
@@ -38,29 +37,25 @@
     </Pager>
 }
 
-@if (uploaded)
-{
-    <button type="button" class="btn btn-success" @onclick="InstallThemes">Install</button>
-}
+<button type="button" class="btn btn-success" @onclick="InstallThemes">Install</button>
 <NavLink class="btn btn-secondary" href="@NavigateUrl()">Cancel</NavLink>
 
 @code {
     public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Host; } }
 
-    bool uploaded = false;
     List<Package> packages;
 
     protected override async Task OnInitializedAsync()
     {
+        List<Theme> themes = await ThemeService.GetThemesAsync();
         packages = await PackageService.GetPackagesAsync("theme");
-    }
-
-    private async Task UploadTheme()
-    {
-        await FileService.UploadFilesAsync("Themes");
-        ModuleInstance.AddModuleMessage("Theme Uploaded Successfully. Click Install To Complete Installation.", MessageType.Success);
-        uploaded = true;
-        StateHasChanged();
+        foreach(Package package in packages.ToArray())
+        {
+            if (themes.Exists(item => Utilities.GetTypeName(item.ThemeName) == package.PackageId))
+            {
+                packages.Remove(package);
+            }
+        }
     }
 
     private async Task InstallThemes()
@@ -72,8 +67,7 @@
     private async Task DownloadTheme(string packageid, string version)
     {
         await PackageService.DownloadPackageAsync(packageid, version, "Themes");
-        ModuleInstance.AddModuleMessage("Theme Downloaded Successfully. Click Install To Complete Installation.", MessageType.Success);
-        uploaded = true;
+        AddModuleMessage("Theme Downloaded Successfully. Click Install To Complete Installation.", MessageType.Success);
         StateHasChanged();
     }
 }

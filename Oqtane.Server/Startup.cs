@@ -50,8 +50,12 @@ namespace Oqtane.Server
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddRazorPages();
+#if DEBUG
+            services.AddServerSideBlazor().AddCircuitOptions(options => { options.DetailedErrors = true; });
+#endif
+#if RELEASE
             services.AddServerSideBlazor();
-
+#endif
             // setup HttpClient for server side in a client side compatible fashion ( with auth cookie )
             if (!services.Any(x => x.ServiceType == typeof(HttpClient)))
             {
@@ -78,11 +82,14 @@ namespace Oqtane.Server
                 options.AddPolicy("EditPage", policy => policy.Requirements.Add(new PermissionRequirement("Page", "Edit")));
                 options.AddPolicy("ViewModule", policy => policy.Requirements.Add(new PermissionRequirement("Module", "View")));
                 options.AddPolicy("EditModule", policy => policy.Requirements.Add(new PermissionRequirement("Module", "Edit")));
+                options.AddPolicy("ViewFolder", policy => policy.Requirements.Add(new PermissionRequirement("Folder", "View")));
+                options.AddPolicy("EditFolder", policy => policy.Requirements.Add(new PermissionRequirement("Folder", "Edit")));
+                options.AddPolicy("ListFolder", policy => policy.Requirements.Add(new PermissionRequirement("Folder", "List")));
             });
-            services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
             // register scoped core services
             services.AddScoped<SiteState>();
+            services.AddScoped<IAuthorizationHandler, PermissionHandler>();
             services.AddScoped<IInstallationService, InstallationService>();
             services.AddScoped<IModuleDefinitionService, ModuleDefinitionService>();
             services.AddScoped<IThemeService, ThemeService>();
@@ -97,8 +104,13 @@ namespace Oqtane.Server
             services.AddScoped<IRoleService, RoleService>();
             services.AddScoped<IUserRoleService, UserRoleService>();
             services.AddScoped<ISettingService, SettingService>();
-            services.AddScoped<IFileService, FileService>();
             services.AddScoped<IPackageService, PackageService>();
+            services.AddScoped<ILogService, LogService>();
+            services.AddScoped<IJobService, JobService>();
+            services.AddScoped<IJobLogService, JobLogService>();
+            services.AddScoped<INotificationService, NotificationService>();
+            services.AddScoped<IFolderService, FolderService>();
+            services.AddScoped<IFileService, FileService>();
 
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
@@ -151,11 +163,6 @@ namespace Oqtane.Server
             services.AddSingleton<IConfigurationRoot>(Configuration);
             services.AddSingleton<IInstallationManager, InstallationManager>();
 
-            // install any modules or themes
-            ServiceProvider sp = services.BuildServiceProvider();
-            var InstallationManager = sp.GetRequiredService<IInstallationManager>();
-            InstallationManager.InstallPackages("Modules,Themes");
-
             // register transient scoped core services
             services.AddTransient<IModuleDefinitionRepository, ModuleDefinitionRepository>();
             services.AddTransient<IThemeRepository, ThemeRepository>();
@@ -173,61 +180,23 @@ namespace Oqtane.Server
             services.AddTransient<IUserRoleRepository, UserRoleRepository>();
             services.AddTransient<IPermissionRepository, PermissionRepository>();
             services.AddTransient<ISettingRepository, SettingRepository>();
+            services.AddTransient<ILogRepository, LogRepository>();
+            services.AddTransient<ILogManager, LogManager>();
+            services.AddTransient<IJobRepository, JobRepository>();
+            services.AddTransient<IJobLogRepository, JobLogRepository>();
+            services.AddTransient<INotificationRepository, NotificationRepository>();
+            services.AddTransient<IFolderRepository, FolderRepository>();
+            services.AddTransient<IFileRepository, FileRepository>();
 
-            // get list of loaded assemblies
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            string path = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            DirectoryInfo folder = new DirectoryInfo(path);
-            List<Assembly> moduleassemblies = new List<Assembly>();
+            services.AddOqtaneModules();
+            services.AddOqtaneThemes();
 
-            // iterate through Oqtane module assemblies in /bin ( filter is narrow to optimize loading process )
-            foreach (FileInfo file in folder.EnumerateFiles("*.Module.*.dll"))
-            {
-                // check if assembly is already loaded
-                Assembly assembly = assemblies.Where(item => item.Location == file.FullName).FirstOrDefault();
-                if (assembly == null)
-                {
-                    // load assembly ( as long as dependencies are in /bin they will load as well )
-                    assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(file.FullName);
-                    moduleassemblies.Add(assembly);
-                }
-            }
+            services.AddMvc()
+                .AddOqtaneApplicationParts()
+                .AddNewtonsoftJson();
 
-            // iterate through Oqtane theme assemblies in /bin ( filter is narrow to optimize loading process )
-            foreach (FileInfo file in folder.EnumerateFiles("*.Theme.*.dll"))
-            {
-                // check if assembly is already loaded
-                Assembly assembly = assemblies.Where(item => item.Location == file.FullName).FirstOrDefault();
-                if (assembly == null)
-                {
-                    // load assembly ( as long as dependencies are in /bin they will load as well )
-                    assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(file.FullName);
-                }
-            }
-
-            services.AddMvc().AddModuleAssemblies(moduleassemblies).AddNewtonsoftJson();
-
-            // dynamically register module services, contexts, and repository classes
-            assemblies = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(item => item.FullName.StartsWith("Oqtane.") || item.FullName.Contains(".Module.")).ToArray();
-            foreach (Assembly assembly in assemblies)
-            {
-                Type[] implementationtypes = assembly.GetTypes()
-                    .Where(item => item.GetInterfaces().Contains(typeof(IService)))
-                    .ToArray();
-                foreach (Type implementationtype in implementationtypes)
-                {
-                    Type servicetype = Type.GetType(implementationtype.AssemblyQualifiedName.Replace(implementationtype.Name, "I" + implementationtype.Name));
-                    if (servicetype != null)
-                    {
-                        services.AddScoped(servicetype, implementationtype); // traditional service interface
-                    }
-                    else
-                    {
-                        services.AddScoped(implementationtype, implementationtype); // no interface defined for service
-                    }
-                }
-            }
+            services.AddOqtaneServices();
+            services.AddOqtaneHostedServices();
 
             services.AddSwaggerGen(c =>
             {
@@ -236,7 +205,7 @@ namespace Oqtane.Server
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IInstallationManager InstallationManager)
         {
             if (env.IsDevelopment())
             {
@@ -247,6 +216,9 @@ namespace Oqtane.Server
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
+
+            // install any modules or themes
+            InstallationManager.InstallPackages("Modules,Themes", false);
 
             app.UseHttpsRedirection();
 
@@ -285,6 +257,9 @@ namespace Oqtane.Server
                 options.AddPolicy("ViewModule", policy => policy.Requirements.Add(new PermissionRequirement("Module", "View")));
                 options.AddPolicy("EditModule", policy => policy.Requirements.Add(new PermissionRequirement("Module", "Edit")));
             });
+
+            // register scoped core services
+            services.AddScoped<SiteState>();
             services.AddScoped<IAuthorizationHandler, PermissionHandler>();
             
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
@@ -338,11 +313,6 @@ namespace Oqtane.Server
             services.AddSingleton<IConfigurationRoot>(Configuration);
             services.AddSingleton<IInstallationManager, InstallationManager>();
 
-            // install any modules or themes
-            ServiceProvider sp = services.BuildServiceProvider();
-            var InstallationManager = sp.GetRequiredService<IInstallationManager>();
-            InstallationManager.InstallPackages("Modules,Themes");
-
             // register transient scoped core services
             services.AddTransient<IModuleDefinitionRepository, ModuleDefinitionRepository>();
             services.AddTransient<IThemeRepository, ThemeRepository>();
@@ -360,61 +330,23 @@ namespace Oqtane.Server
             services.AddTransient<IUserRoleRepository, UserRoleRepository>();
             services.AddTransient<IPermissionRepository, PermissionRepository>();
             services.AddTransient<ISettingRepository, SettingRepository>();
+            services.AddTransient<ILogRepository, LogRepository>();
+            services.AddTransient<ILogManager, LogManager>();
+            services.AddTransient<IJobRepository, JobRepository>();
+            services.AddTransient<IJobLogRepository, JobLogRepository>();
+            services.AddTransient<INotificationRepository, NotificationRepository>();
+            services.AddTransient<IFolderRepository, FolderRepository>();
+            services.AddTransient<IFileRepository, FileRepository>();
 
-            // get list of loaded assemblies
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            string path = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            DirectoryInfo folder = new DirectoryInfo(path);
-            List<Assembly> moduleassemblies = new List<Assembly>();
+            services.AddOqtaneModules();
+            services.AddOqtaneThemes();
 
-            // iterate through Oqtane module assemblies in /bin ( filter is narrow to optimize loading process )
-            foreach (FileInfo file in folder.EnumerateFiles("*.Module.*.dll"))
-            {
-                // check if assembly is already loaded
-                Assembly assembly = assemblies.Where(item => item.Location == file.FullName).FirstOrDefault();
-                if (assembly == null)
-                {
-                    // load assembly ( as long as dependencies are in /bin they will load as well )
-                    assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(file.FullName);
-                    moduleassemblies.Add(assembly);
-                }
-            }
+            services.AddMvc()
+                .AddOqtaneApplicationParts()
+                .AddNewtonsoftJson();
 
-            // iterate through Oqtane theme assemblies in /bin ( filter is narrow to optimize loading process )
-            foreach (FileInfo file in folder.EnumerateFiles("*.Theme.*.dll"))
-            {
-                // check if assembly is already loaded
-                Assembly assembly = assemblies.Where(item => item.Location == file.FullName).FirstOrDefault();
-                if (assembly == null)
-                {
-                    // load assembly ( as long as dependencies are in /bin they will load as well )
-                    assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(file.FullName);
-                }
-            }
-
-            services.AddMvc().AddModuleAssemblies(moduleassemblies).AddNewtonsoftJson();
-           
-            // dynamically register module services, contexts, and repository classes
-            assemblies = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(item => item.FullName.StartsWith("Oqtane.") || item.FullName.Contains(".Module.")).ToArray();
-            foreach (Assembly assembly in assemblies)
-            {
-                Type[] implementationtypes = assembly.GetTypes()
-                    .Where(item => item.GetInterfaces().Contains(typeof(IService)))
-                    .ToArray();
-                foreach (Type implementationtype in implementationtypes)
-                {
-                    Type servicetype = Type.GetType(implementationtype.AssemblyQualifiedName.Replace(implementationtype.Name, "I" + implementationtype.Name));
-                    if (servicetype != null)
-                    {
-                        services.AddScoped(servicetype, implementationtype); // traditional service interface
-                    }
-                    else
-                    {
-                        services.AddScoped(implementationtype, implementationtype); // no interface defined for service
-                    }
-                }
-            }
+            services.AddOqtaneServices();
+            services.AddOqtaneHostedServices();
 
             services.AddSwaggerGen(c =>
             {
@@ -429,7 +361,7 @@ namespace Oqtane.Server
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IInstallationManager InstallationManager)
         {
             app.UseResponseCompression();
 
@@ -438,6 +370,9 @@ namespace Oqtane.Server
                 app.UseDeveloperExceptionPage();
                 app.UseBlazorDebugging();
             }
+
+            // install any modules or themes
+            InstallationManager.InstallPackages("Modules,Themes", false);
 
             app.UseClientSideBlazorFiles<Client.Startup>();
             app.UseStaticFiles();

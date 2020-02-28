@@ -4,6 +4,10 @@ using Microsoft.AspNetCore.Authorization;
 using Oqtane.Repository;
 using Oqtane.Models;
 using Oqtane.Shared;
+using Oqtane.Infrastructure;
+using System.Linq;
+using System;
+using System.Net;
 
 namespace Oqtane.Controllers
 {
@@ -11,14 +15,17 @@ namespace Oqtane.Controllers
     public class AliasController : Controller
     {
         private readonly IAliasRepository Aliases;
+        private readonly ILogManager logger;
 
-        public AliasController(IAliasRepository Aliases)
+        public AliasController(IAliasRepository Aliases, ILogManager logger)
         {
             this.Aliases = Aliases;
+            this.logger = logger;
         }
 
         // GET: api/<controller>
         [HttpGet]
+        [Authorize(Roles = Constants.AdminRole)]
         public IEnumerable<Alias> Get()
         {
             return Aliases.GetAliases();
@@ -26,11 +33,33 @@ namespace Oqtane.Controllers
 
         // GET api/<controller>/5
         [HttpGet("{id}")]
+        [Authorize(Roles = Constants.AdminRole)]
         public Alias Get(int id)
         {
             return Aliases.GetAlias(id);
         }
 
+        // GET api/<controller>/name/localhost:12345
+        [HttpGet("name/{name}")]
+        public Alias Get(string name)
+        {
+            name = WebUtility.UrlDecode(name);
+            List<Alias> aliases = Aliases.GetAliases().ToList();
+            Alias alias = null;
+            alias = aliases.Where(item => item.Name == name).FirstOrDefault();
+            if (alias == null && name.Contains("/"))
+            {
+                // lookup alias without folder name
+                alias = aliases.Find(item => item.Name == name.Substring(0, name.IndexOf("/")));
+            }
+            if (alias == null && aliases.Count > 0)
+            {
+                // use first alias if name does not exist
+                alias = aliases.FirstOrDefault();
+            }
+            return alias; 
+        }
+        
         // POST api/<controller>
         [HttpPost]
         [Authorize(Roles = Constants.AdminRole)]
@@ -39,6 +68,7 @@ namespace Oqtane.Controllers
             if (ModelState.IsValid)
             {
                 Alias = Aliases.AddAlias(Alias);
+                logger.Log(LogLevel.Information, this, LogFunction.Create, "Alias Added {Alias}", Alias);
             }
             return Alias;
         }
@@ -51,6 +81,7 @@ namespace Oqtane.Controllers
             if (ModelState.IsValid)
             {
                 Alias = Aliases.UpdateAlias(Alias);
+                logger.Log(LogLevel.Information, this, LogFunction.Update, "Alias Updated {Alias}", Alias);
             }
             return Alias;
         }
@@ -61,6 +92,7 @@ namespace Oqtane.Controllers
         public void Delete(int id)
         {
             Aliases.DeleteAlias(id);
+            logger.Log(LogLevel.Information, this, LogFunction.Delete, "Alias Deleted {AliasId}", id);
         }
     }
 }

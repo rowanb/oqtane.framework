@@ -2,8 +2,10 @@
 @inherits ModuleBase
 @typeparam TableItem
 
-<p align="center">
-    <table class="table table-borderless">
+<p>
+    @if(Format == "Table")
+    {
+    <table class="@Class">
         <thead>
             <tr>@Header</tr>
         </thead>
@@ -11,10 +13,29 @@
             @foreach (var item in ItemList)
             {
                 <tr>@Row(item)</tr>
+                @if (Detail != null)
+                {
+                    <tr>@Detail(item)</tr>
+                }
             }
         </tbody>
     </table>
-    <div>
+    }
+    @if(Format == "Grid")
+    {
+    <div class="@Class">
+        <div class="row">@Header</div>
+        @foreach (var item in ItemList)
+        {
+            <div class="row">@Row(item)</div>
+            @if (Detail != null)
+            {
+                <div class="row">@Detail(item)</div>
+            }
+        }
+    </div>
+    }
+    <div class="mx-auto text-center">
         @if (Page > MaxPages)
         {
             <button class="btn btn-secondary" @onclick=@(async () => SetPagerSize("back"))><span class="oi oi-media-skip-backward" title="back" aria-hidden="true"></span></button>
@@ -44,17 +65,23 @@
 
 @code {
     int Pages = 0;
-    int Page;
+    int Page = 1;
     int MaxItems;
     int MaxPages;
     int StartPage;
     int EndPage;
 
     [Parameter]
+    public string Format { get; set; }
+
+    [Parameter]
     public RenderFragment Header { get; set; }
 
     [Parameter]
     public RenderFragment<TableItem> Row { get; set; }
+
+    [Parameter]
+    public RenderFragment<TableItem> Detail { get; set; }
 
     [Parameter]
     public IEnumerable<TableItem> Items { get; set; }
@@ -65,10 +92,28 @@
     [Parameter]
     public string DisplayPages { get; set; }
 
+    [Parameter]
+    public string Class { get; set; }
+
     IEnumerable<TableItem> ItemList { get; set; }
 
     protected override void OnParametersSet()
     {
+        if (string.IsNullOrEmpty(Format))
+        {
+            Format = "Table";
+        }
+        if (string.IsNullOrEmpty(Class))
+        {
+            if (Format == "Table")
+            {
+                Class = "table table-borderless";
+            }
+            else
+            {
+                Class = "container";
+            }
+        }
         if (string.IsNullOrEmpty(PageSize))
         {
             MaxItems = 10;
@@ -85,7 +130,6 @@
         {
             MaxPages = int.Parse(DisplayPages);
         }
-        Page = 1;
 
         if (Items != null)
         {
@@ -98,7 +142,7 @@
 
     public void UpdateList(int CurrentPage)
     {
-        ItemList = Items.Skip((Page - 1) * MaxItems).Take(MaxItems);
+        ItemList = Items.Skip((CurrentPage - 1) * MaxItems).Take(MaxItems);
         Page = CurrentPage;
         StateHasChanged();
     }
@@ -107,7 +151,15 @@
     {
         if (direction == "forward")
         {
-            StartPage = EndPage + 1;
+            if (EndPage + 1 < Pages)
+            {
+                StartPage = EndPage + 1;
+            }
+            else
+            {
+                StartPage = 1;
+            }
+
             if (EndPage + MaxPages < Pages)
             {
                 EndPage = StartPage + MaxPages - 1;

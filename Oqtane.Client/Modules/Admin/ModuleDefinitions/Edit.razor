@@ -40,12 +40,12 @@
 
     PermissionGrid permissiongrid;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         try
         {
             ModuleDefinitionId = Int32.Parse(PageState.QueryString["id"]);
-            ModuleDefinition moduledefinition = PageState.ModuleDefinitions.Where(item => item.ModuleDefinitionId == ModuleDefinitionId).FirstOrDefault();
+            ModuleDefinition moduledefinition = await ModuleDefinitionService.GetModuleDefinitionAsync(ModuleDefinitionId, ModuleState.SiteId);
             if (moduledefinition != null)
             {
                 name = moduledefinition.Name;
@@ -58,7 +58,8 @@
         }
         catch (Exception ex)
         {
-            ModuleInstance.AddModuleMessage(ex.Message, MessageType.Error);
+            await logger.LogError(ex, "Error Loading ModuleDefinition {ModuleDefinitionId} {Error}", ModuleDefinitionId, ex.Message);
+            AddModuleMessage("Error Loading Module", MessageType.Error);
         }
     }
 
@@ -66,14 +67,16 @@
     {
         try
         {
-            ModuleDefinition moduledefinition = PageState.ModuleDefinitions.Where(item => item.ModuleDefinitionId == ModuleDefinitionId).FirstOrDefault();
+            ModuleDefinition moduledefinition = await ModuleDefinitionService.GetModuleDefinitionAsync(ModuleDefinitionId, ModuleState.SiteId);
             moduledefinition.Permissions = permissiongrid.GetPermissions();
             await ModuleDefinitionService.UpdateModuleDefinitionAsync(moduledefinition);
+            await logger.LogInformation("ModuleDefinition Saved {ModuleDefinition}", moduledefinition);
             NavigationManager.NavigateTo(NavigateUrl(Reload.Site));
         }
         catch (Exception ex)
         {
-            ModuleInstance.AddModuleMessage(ex.Message, MessageType.Error);
+            await logger.LogError(ex, "Error Saving ModuleDefinition {ModuleDefinitionId} {Error}", ModuleDefinitionId, ex.Message);
+            AddModuleMessage("Error Saving Module", MessageType.Error);
         }
     }
 }

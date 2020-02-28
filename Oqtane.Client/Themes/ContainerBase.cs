@@ -3,6 +3,7 @@ using Microsoft.JSInterop;
 using Oqtane.Shared;
 using Oqtane.Models;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace Oqtane.Themes
 {
@@ -22,16 +23,6 @@ namespace Oqtane.Themes
         public string ThemePath()
         {
             return "Themes/" + this.GetType().Namespace + "/";
-        }
-
-        public async Task AddCSS(string Url)
-        {
-            if (!Url.StartsWith("http"))
-            {
-                Url = ThemePath() + Url;
-            }
-            var interop = new Interop(JSRuntime);
-            await interop.AddCSS("Theme:" + Utilities.CreateIdFromUrl(Url), Url);
         }
 
         public string NavigateUrl()

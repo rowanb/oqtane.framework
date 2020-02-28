@@ -22,7 +22,7 @@
     </tr>
     <tr>
         <td>
-            <label for="Name" class="control-label">Auto Assigned: </label>
+            <label for="Name" class="control-label">Auto Assigned? </label>
         </td>
         <td>
             <select class="form-control" @bind="@isautoassigned">
@@ -71,29 +71,29 @@
         }
         catch (Exception ex)
         {
-            ModuleInstance.AddModuleMessage(ex.Message, MessageType.Error);
+            await logger.LogError(ex, "Error Loading Role {RoleId} {Error}", roleid, ex.Message);
+            AddModuleMessage("Error Loading Role", MessageType.Error);
         }
     }
 
     private async Task SaveRole()
     {
+        Role role = await RoleService.GetRoleAsync(roleid);
+        role.Name = name;
+        role.Description = description;
+        role.IsAutoAssigned = (isautoassigned == null ? false : Boolean.Parse(isautoassigned));
+        role.IsSystem = (issystem == null ? false : Boolean.Parse(issystem));
+
         try
         {
-            Role role = await RoleService.GetRoleAsync(roleid);
-            if (role != null)
-            {
-                role.Name = name;
-                role.Description = description;
-                role.IsAutoAssigned = (isautoassigned == null ? false : Boolean.Parse(isautoassigned));
-                role.IsSystem = (issystem == null ? false : Boolean.Parse(issystem));
-                await RoleService.UpdateRoleAsync(role);
-            }
+            role = await RoleService.UpdateRoleAsync(role);
+            await logger.LogInformation("Role Saved {Role}", role);
             NavigationManager.NavigateTo(NavigateUrl());
         }
         catch (Exception ex)
         {
-            ModuleInstance.AddModuleMessage(ex.Message, MessageType.Error);
+            await logger.LogError(ex, "Error Saving Role {Role} {Error}", role, ex.Message);
+            AddModuleMessage("Error Saving Role", MessageType.Error);
         }
     }
-
 }

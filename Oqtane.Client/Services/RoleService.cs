@@ -26,12 +26,6 @@ namespace Oqtane.Services
             get { return CreateApiUrl(sitestate.Alias, NavigationManager.Uri, "Role"); }
         }
 
-        public async Task<List<Role>> GetRolesAsync()
-        {
-            List<Role> Roles = await http.GetJsonAsync<List<Role>>(apiurl);
-            return Roles.OrderBy(item => item.Name).ToList();
-        }
-
         public async Task<List<Role>> GetRolesAsync(int SiteId)
         {
             List<Role> Roles = await http.GetJsonAsync<List<Role>>(apiurl + "?siteid=" + SiteId.ToString());
@@ -50,7 +44,7 @@ namespace Oqtane.Services
 
         public async Task<Role> UpdateRoleAsync(Role Role)
         {
-            return await http.PutJsonAsync<Role>(apiurl + "/" + Role.SiteId.ToString(), Role);
+            return await http.PutJsonAsync<Role>(apiurl + "/" + Role.RoleId.ToString(), Role);
         }
         public async Task DeleteRoleAsync(int RoleId)
         {

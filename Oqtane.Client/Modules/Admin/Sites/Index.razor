@@ -1,6 +1,7 @@
 ﻿@namespace Oqtane.Modules.Admin.Sites
 @inherits ModuleBase
-
+@inject NavigationManager NavigationManager
+@inject IAliasService AliasService
 @inject ISiteService SiteService
 
 @if (sites == null)
@@ -9,18 +10,18 @@
 }
 else
 {
-    <ActionLink Action="Add" Text="Add Site" Style="float: right; margin: 10px;" />
+    <ActionLink Action="Add" Text="Add Site" />
 
     <Pager Items="@sites">
         <Header>
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
             <th>Name</th>
-            <th>&nbsp;</th>
-            <th>&nbsp;</th>
         </Header>
         <Row>
-            <td>@context.Name</td>
-            <td><ActionLink Action="Edit" Parameters="@($"id=" + context.SiteId.ToString())" /></td>
-            <td><ActionLink Action="Delete" Parameters="@($"id=" + context.SiteId.ToString())" Class="btn btn-danger" /></td>
+            <td><NavLink class="btn btn-primary" href="@(scheme + context.Name + "/admin/site")">Edit</NavLink></td>
+            <td><NavLink class="btn btn-danger" href="@(scheme + context.Name + "/admin/site")">Delete</NavLink></td>
+            <td><a href="@(scheme + context.Name)">@context.Name</a></td>
         </Row>
     </Pager>
 }
@@ -28,10 +29,22 @@ else
 @code {
     public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Host; } }
 
-    List<Site> sites;
+    List<Alias> sites;
+    string scheme;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        sites = await SiteService.GetSitesAsync();
+        Uri uri = new Uri(NavigationManager.Uri);
+        scheme = uri.Scheme + "://";
+
+        List<Alias> aliases = await AliasService.GetAliasesAsync();
+        sites = new List<Alias>();
+        foreach (Alias alias in aliases)
+        {
+            if (!sites.Exists(item => item.TenantId == alias.TenantId && item.SiteId == alias.SiteId))
+            {
+                sites.Add(alias);
+            }
+        }
     }
 }
